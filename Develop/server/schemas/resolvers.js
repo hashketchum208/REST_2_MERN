@@ -1,21 +1,21 @@
 const { AuthenticationError } = require('apollo-server-express');
-const { User, Post } = require('../models');
+const { User, Book } = require('../models');
 const { signToken } = require('../utils/auth');
 
 const resolvers = {
   Query: {
     users: async () => {
-      return User.find().populate('posts');
+      return User.find().populate('books');
     },
     user: async (parent, { username }) => {
-      return User.findOne({ username }).populate('posts');
+      return User.findOne({ username }).populate('books');
     },
-    posts: async (parent, { postText }) => {
-      const params = postText ? { postText } : {};
-      return Post.find(params).sort({ createdAt: -1 });
+    books: async (parent, { title }) => {
+      const params = title ? { title } : {};
+      return Book.find(params).sort({ createdAt: -1 });
     },
-    post: async (parent, { postId }) => {
-      return Post.findOne({ _id: postId });
+    book: async (parent, { bookId }) => {
+      return Book.findOne({ _id: bookId });
     },
   },
 
@@ -42,22 +42,31 @@ const resolvers = {
 
       return { token, user };
     },
-    addPost: async (parent, { postText, postAuthor }) => {
-      const post = await Post.create({ postText, postAuthor });
+    saveBook: async (parent, { user, body }) => {
+      
+        const updatedBook = await User.findOneAndUpdate(
+          { _id: user._id },
+          { $addToSet: { savedBooks: body } },
+          { new: true, runValidators: true }
+        );
+        return updatedBook
+      },
+      
+      // remove a book from `savedBooks`
+    removeBook: async (parent, { user, params }) => {
 
-      await User.findOneAndUpdate(
-        { username: postAuthor },
-        { $addToSet: { posts: post._id } }
+      const deleteBook = await User.findOneAndDelete(
+        { _id: user._id },
+        { $pull: { savedBooks: { bookId: params.bookId } } },
+        { new: true }
       );
-
-      return post;
+      
+      return deleteBook;
+    },
+      
     },
     
-    removePost: async (parent, { postId }) => {
-      return Post.findOneAndDelete({ _id: postId });
-    },
     
-  },
-};
+  }
 
 module.exports = resolvers;
